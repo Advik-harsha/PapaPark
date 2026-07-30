@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Digital Wallet - SmartPark</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+</head>
+<body>
+    <div class="app-layout">
+        <div th:replace="~{fragments/sidebar :: sidebar}"></div>
+        
+        <div class="main-content">
+            <div th:replace="~{fragments/header :: header}"></div>
+            
+            <div class="content-wrapper" style="display: flex; gap: 20px; flex-wrap: wrap;">
+                
+                <div class="wallet-left" style="flex: 1; min-width: 320px;">
+                    <!-- Balance Card -->
+                    <div class="card glass-panel wallet-card mb-4" style="background: linear-gradient(135deg, #00d4ff, #0099ff); color: #fff; text-align: center; padding: 35px 20px; border-radius: 16px;">
+                        <h3 style="margin-top: 0; font-size: 1.1rem; opacity: 0.9;">Available Balance</h3>
+                        <h1 id="walletBalance" style="font-size: 3rem; margin: 15px 0; text-shadow: 0 4px 10px rgba(0,0,0,0.2);">₹0.00</h1>
+                        <span class="badge badge-success" style="background: rgba(255,255,255,0.2); color: white;">⚡ Auto-Deduct Ready</span>
+                    </div>
+
+                    <!-- Add Funds Card -->
+                    <div class="card glass-panel">
+                        <div class="card-header">
+                            <h3>💳 Add Money via Card / UPI</h3>
+                        </div>
+                        <div class="card-body">
+                            <form id="addMoneyForm" onsubmit="initiateAddMoney(event)">
+                                <div class="form-group">
+                                    <label>Enter Top-Up Amount (₹)</label>
+                                    <input type="number" id="amount" class="form-input" min="1" step="0.01" required placeholder="e.g. 500" style="font-size: 1.2rem; font-weight: 600;">
+                                </div>
+
+                                <!-- Quick Amount Chips -->
+                                <div style="display: flex; gap: 8px; margin-bottom: 15px; flex-wrap: wrap;">
+                                    <button type="button" class="btn btn-sm btn-secondary" onclick="setQuickAmount(100)">+ ₹100</button>
+                                    <button type="button" class="btn btn-sm btn-secondary" onclick="setQuickAmount(200)">+ ₹200</button>
+                                    <button type="button" class="btn btn-sm btn-secondary" onclick="setQuickAmount(500)">+ ₹500</button>
+                                    <button type="button" class="btn btn-sm btn-secondary" onclick="setQuickAmount(1000)">+ ₹1,000</button>
+                                </div>
+
+                                <div class="form-group">
+                                    <label>Select Payment Source</label>
+                                    <select id="walletPaymentSource" class="form-select" required>
+                                        <option value="CARD">💳 Credit / Debit Card (3D Secure)</option>
+                                        <option value="UPI">📱 UPI / QR Code (GPay, PhonePe, Paytm)</option>
+                                        <option value="NETBANKING">🏦 Net Banking (Instant)</option>
+                                    </select>
+                                </div>
+
+                                <button type="submit" class="btn btn-primary btn-block" style="height: 44px;">Proceed to Add Funds</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="wallet-right" style="flex: 2; min-width: 400px;">
+                    <div class="card glass-panel" style="height: 100%;">
+                        <div class="card-header">
+                            <h3>Wallet Transaction History</h3>
+                        </div>
+                        <div class="card-body">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Date & Time</th>
+                                        <th>Type</th>
+                                        <th>Amount</th>
+                                        <th>Remarks</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="transactionsTable">
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- Wallet Payment Gateway Modal -->
+    <div id="walletGtwModal" class="modal-overlay">
+        <div class="modal glass-panel" style="max-width: 480px;">
+            <div class="modal-header" style="background: linear-gradient(135deg, #00d4ff, #0099ff); color: white;">
+                <h3>🛡️ SmartPark Wallet Top-Up</h3>
+                <button class="btn-close" onclick="closeWalletGtwModal()" style="color: white;">&times;</button>
+            </div>
+            <div class="modal-body" style="padding: 20px;">
+                <div style="text-align: center; margin-bottom: 20px;">
+                    <span style="color: var(--text-secondary); font-size: 0.9rem;">Adding to Wallet</span>
+                    <h1 id="gtwTopUpAmount" style="font-size: 2.2rem; color: var(--success); margin: 5px 0;">₹0.00</h1>
+                    <span id="gtwSourceTag" class="badge badge-info">Payment Method: CARD</span>
+                </div>
+
+                <!-- Card Details Input -->
+                <div id="wGtwCardSection">
+                    <div class="form-group">
+                        <label>Card Number</label>
+                        <input type="text" id="wGtwCardNum" class="form-input" placeholder="4532 ···· ···· 8901" maxlength="19" value="4532 8901 2345 6789">
+                    </div>
+                    <div style="display: flex; gap: 15px;">
+                        <div class="form-group" style="flex: 1;">
+                            <label>Expiry</label>
+                            <input type="text" id="wGtwCardExp" class="form-input" placeholder="MM/YY" maxlength="5" value="12/28">
+                        </div>
+                        <div class="form-group" style="flex: 1;">
+                            <label>CVV</label>
+                            <input type="password" id="wGtwCardCvv" class="form-input" placeholder="•••" maxlength="3" value="888">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- UPI Details Input -->
+                <div id="wGtwUpiSection" style="display: none; text-align: center;">
+                    <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 10px;">Scan QR with GPay / PhonePe / Paytm</p>
+                    <div style="background: white; padding: 12px; border-radius: 12px; display: inline-block; margin-bottom: 15px;">
+                        <img id="wGtwQrImage" src="" alt="UPI QR" style="width: 140px; height: 140px;">
+                    </div>
+                    <div class="form-group" style="text-align: left;">
+                        <label>Or Enter UPI ID</label>
+                        <input type="text" id="wGtwUpiId" class="form-input" placeholder="user@upi" value="user@okaxis">
+                    </div>
+                </div>
+
+                <!-- 3D OTP Verification View -->
+                <div id="wGtwOtpSection" style="display: none; text-align: center; padding: 15px 0;">
+                    <span style="font-size: 2.5rem;">🔐</span>
+                    <h4>3D Secure OTP Code</h4>
+                    <p style="font-size: 0.85rem; color: var(--text-secondary);">Enter the 6-digit OTP code sent to your registered mobile</p>
+                    <input type="text" id="wGtwOtpInput" class="form-input" style="width: 160px; font-size: 1.4rem; text-align: center; letter-spacing: 4px; margin: 15px auto;" maxlength="6" value="123456">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeWalletGtwModal()">Cancel</button>
+                <button id="wGtwConfirmBtn" class="btn btn-primary" onclick="confirmWalletTopUp()">Authorize & Add Money</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="alertContainer"></div>
+    <script th:src="@{/js/app.js}"></script>
+    <script>
+        let pendingTopUpAmount = 0;
+        let pendingTopUpSource = 'CARD';
+        let topUpStep = 'INPUT';
+
+        document.addEventListener('DOMContentLoaded', () => {
+            requireAuth();
+            document.getElementById('pageTitle').innerText = 'Digital Wallet';
+            loadWalletData();
+        });
+
+        function setQuickAmount(amt) {
+            document.getElementById('amount').value = amt;
+        }
+
+        async function loadWalletData() {
+            try {
+                const userId = api.getUserId();
+                const balance = await api.get('/api/wallet/balance/' + userId);
+                document.getElementById('walletBalance').innerText = `₹${(balance || 0).toFixed(2)}`;
+
+                const history = await api.get('/api/wallet/history/' + userId);
+                const tbody = document.getElementById('transactionsTable');
+                tbody.innerHTML = '';
+
+                if (history && history.length > 0) {
+                    history.forEach(tx => {
+                        const isCredit = (tx.type === 'CREDIT');
+                        const typeBadge = isCredit 
+                            ? `<span class="badge badge-success">CREDIT</span>` 
+                            : `<span class="badge badge-danger">DEBIT</span>`;
+                        const amountColor = isCredit ? '#00e676' : '#ff5252';
+                        const sign = isCredit ? '+' : '-';
+                        const formattedDate = tx.transactionDate ? new Date(tx.transactionDate).toLocaleString() : '-';
+
+                        tbody.innerHTML += `
+                            <tr>
+                                <td>${formattedDate}</td>
+                                <td>${typeBadge}</td>
+                                <td style="color: ${amountColor}; font-weight: 600;">${sign}₹${Math.abs(tx.amount || 0).toFixed(2)}</td>
+                                <td>${tx.remarks || '-'}</td>
+                            </tr>
+                        `;
+                    });
+                } else {
+                    tbody.innerHTML = '<tr><td colspan="4" class="text-center">No wallet transactions found.</td></tr>';
+                }
+            } catch (error) {
+                console.error(error);
+                showAlert(error.message || 'Error loading wallet data', 'danger');
+            }
+        }
+
+        function initiateAddMoney(e) {
+            e.preventDefault();
+            pendingTopUpAmount = parseFloat(document.getElementById('amount').value);
+            pendingTopUpSource = document.getElementById('walletPaymentSource').value;
+            topUpStep = 'INPUT';
+
+            if (!pendingTopUpAmount || pendingTopUpAmount <= 0) {
+                showAlert('Please enter a valid amount', 'warning');
+                return;
+            }
+
+            document.getElementById('gtwTopUpAmount').innerText = `₹${pendingTopUpAmount.toFixed(2)}`;
+            document.getElementById('gtwSourceTag').innerText = `Source: ${pendingTopUpSource}`;
+
+            document.getElementById('wGtwCardSection').style.display = (pendingTopUpSource === 'CARD' || pendingTopUpSource === 'NETBANKING') ? 'block' : 'none';
+            document.getElementById('wGtwUpiSection').style.display = (pendingTopUpSource === 'UPI') ? 'block' : 'none';
+            document.getElementById('wGtwOtpSection').style.display = 'none';
+
+            if (pendingTopUpSource === 'UPI') {
+                const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=upi://pay?pa=smartparkwallet@upi&am=${pendingTopUpAmount}`;
+                document.getElementById('wGtwQrImage').src = qrUrl;
+            }
+
+            document.getElementById('wGtwConfirmBtn').innerText = `Authorize & Add ₹${pendingTopUpAmount.toFixed(2)}`;
+            document.getElementById('walletGtwModal').classList.add('active');
+        }
+
+        function closeWalletGtwModal() {
+            document.getElementById('walletGtwModal').classList.remove('active');
+        }
+
+        async function confirmWalletTopUp() {
+            if (topUpStep === 'INPUT') {
+                topUpStep = 'OTP';
+                document.getElementById('wGtwCardSection').style.display = 'none';
+                document.getElementById('wGtwUpiSection').style.display = 'none';
+                document.getElementById('wGtwOtpSection').style.display = 'block';
+                document.getElementById('wGtwConfirmBtn').innerText = 'Verify OTP & Confirm';
+                return;
+            }
+
+            const userId = api.getUserId();
+            const btn = document.getElementById('wGtwConfirmBtn');
+
+            try {
+                btn.innerText = 'Processing Top-Up...';
+                btn.disabled = true;
+
+                await api.post(`/api/wallet/add-money?userId=${userId}&amount=${pendingTopUpAmount}`);
+                
+                sendBrowserNotification('💰 Wallet Recharged', `Successfully added ₹${pendingTopUpAmount.toFixed(2)} to your wallet!`);
+                sendSmsAlert(api.getUser()?.phone, `SmartPark: Rs.${pendingTopUpAmount.toFixed(2)} added to your wallet via ${pendingTopUpSource}. New balance available.`);
+
+                showAlert('Funds added to wallet successfully!', 'success');
+                closeWalletGtwModal();
+                document.getElementById('addMoneyForm').reset();
+                loadWalletData();
+            } catch (error) {
+                showAlert(error.message || 'Failed to add money', 'danger');
+            } finally {
+                btn.disabled = false;
+                btn.innerText = 'Authorize & Add Money';
+            }
+        }
+    </script>
+</body>
+</html>

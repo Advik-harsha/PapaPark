@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Payments & Receipts - SmartPark</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+    <!-- Razorpay Checkout SDK -->
+    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+    <!-- html2pdf.js for 1-Click PDF Generation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+</head>
+<body>
+    <div class="app-layout">
+        <div th:replace="~{fragments/sidebar :: sidebar}"></div>
+        
+        <div class="main-content">
+            <div th:replace="~{fragments/header :: header}"></div>
+            
+            <div class="content-wrapper">
+                <div class="stats-grid mb-4">
+                    <div class="stat-card glass-panel">
+                        <h3>Total Paid</h3>
+                        <p class="stat-value" id="totalPaid" style="color: var(--success);">₹0.00</p>
+                    </div>
+                    <div class="stat-card glass-panel">
+                        <h3>Pending Dues</h3>
+                        <p class="stat-value" id="pendingAmount" style="color: var(--warning);">₹0.00</p>
+                    </div>
+                </div>
+
+                <div class="card glass-panel">
+                    <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+                        <h3>Payment History & Tax Invoices</h3>
+                        <span class="badge badge-info" style="font-size: 0.75rem;">💳 Razorpay Test Mode Active</span>
+                    </div>
+                    <div class="card-body">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Session ID</th>
+                                    <th>Transaction ID</th>
+                                    <th>Payment Method</th>
+                                    <th>Amount</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="paymentsTable">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tax Invoice / Receipt Modal -->
+    <div id="receiptModal" class="modal-overlay">
+        <div class="modal" style="max-width: 550px;">
+            <div class="modal-header" style="background: #0f1923; color: white;">
+                <h3>📄 Digital Parking Tax Invoice</h3>
+                <button class="btn-close" onclick="closeReceiptModal()" style="color: white;">&times;</button>
+            </div>
+            <div class="modal-body" style="background: #f4f6f9; padding: 20px;">
+                <div class="receipt-box" id="receiptContent">
+                    <div class="receipt-header">
+                        <h2>🅿️ SmartPark Systems</h2>
+                        <p style="font-size: 0.85rem; color: #666; margin: 0;">Official Tax Invoice & Parking Receipt</p>
+                    </div>
+                    <div class="receipt-row"><span>Transaction ID:</span> <strong id="recTxId">-</strong></div>
+                    <div class="receipt-row"><span>Session ID:</span> <span id="recSessionId">-</span></div>
+                    <div class="receipt-row"><span>Date & Time:</span> <span id="recDate">-</span></div>
+                    <div class="receipt-row"><span>Payment Gateway:</span> <span id="recType">Razorpay (Test Mode)</span></div>
+                    <div class="receipt-row"><span>Payment Status:</span> <span id="recStatus" style="font-weight: 700; color: #00c853;">PAID</span></div>
+                    <div class="receipt-row total"><span>Total Amount Paid:</span> <span id="recAmount">₹0.00</span></div>
+                    <div class="receipt-footer">
+                        <p>Thank you for using SmartPark Digital System!</p>
+                        <p style="font-size: 0.75rem; color: #999;">GSTIN: 27AAACS1414B1Z2 · System Generated Invoice</p>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeReceiptModal()">Close</button>
+                <button class="btn btn-primary" onclick="downloadPdfInvoice()">📥 Download PDF Invoice</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="alertContainer"></div>
+    <script th:src="@{/js/app.js}"></script>
+    <script>
+        let allPaymentsData = [];
+
+        document.addEventListener('DOMContentLoaded', () => {
+            requireAuth();
+            document.getElementById('pageTitle').innerText = 'Payments & Receipts';
+            loadPayments();
+        });
+
+        async function loadPayments() {
+            try {
+                const userId = api.getUserId();
+                allPaymentsData = await api.get('/api/payments/user/' + userId);
+
+                let totalPaid = 0;
+                let pendingAmount = 0;
+
+                const tbody = document.getElementById('paymentsTable');
+                tbody.innerHTML = '';
+
+                if (allPaymentsData && allPaymentsData.length > 0) {
+                    allPaymentsData.forEach(p => {
+                        const status = (p.paymentStatus || 'PAID').toUpperCase();
+                        const isPaid = status === 'PAID';
+                        const isPending = status === 'PENDING';
+
+                        if (isPaid) totalPaid += (p.amount || 0);
+                        if (isPending) pendingAmount += (p.amount || 0);
+
+                        let statusBadge = '<span class="badge badge-success">PAID</span>';
+                        if (isPending) statusBadge = '<span class="badge badge-warning">PENDING</span>';
+                        if (status === 'FAILED') statusBadge = '<span class="badge badge-danger">FAILED</span>';
+
+                        const actionBtns = isPaid 
+                            ? `<button class="btn btn-sm btn-secondary" onclick='openReceiptModal(${JSON.stringify(p)})'>📄 Receipt</button>`
+                            : `<button class="btn btn-sm btn-primary" onclick="launchRazorpayCheckout('${p.sessionId}', ${p.amount})">💳 Razorpay Pay</button>`;
+
+                        tbody.innerHTML += `
+                            <tr>
+                                <td>${new Date(p.paymentDate).toLocaleString()}</td>
+                                <td>${p.sessionId || '-'}</td>
+                                <td>${p.transactionId || '-'}</td>
+                                <td><span class="badge badge-info">${p.paymentType || 'PAY_NOW'}</span></td>
+                                <td>₹${(p.amount || 0).toFixed(2)}</td>
+                                <td>${statusBadge}</td>
+                                <td>${actionBtns}</td>
+                            </tr>
+                        `;
+                    });
+                } else {
+                    tbody.innerHTML = '<tr><td colspan="7" class="text-center">No payment transactions found.</td></tr>';
+                }
+
+                document.getElementById('totalPaid').innerText = `₹${totalPaid.toFixed(2)}`;
+                document.getElementById('pendingAmount').innerText = `₹${pendingAmount.toFixed(2)}`;
+
+            } catch (error) {
+                console.error(error);
+                showAlert(error.message || 'Error loading payments', 'danger');
+            }
+        }
+
+        function launchRazorpayCheckout(sessionId, amount) {
+            const user = api.getUser() || {};
+            const options = {
+                "key": "rzp_test_SmartPark123", // Razorpay Test Mode Key
+                "amount": amount * 100, // Amount in paise
+                "currency": "INR",
+                "name": "SmartPark Digital System",
+                "description": `Parking Fee for Session ${sessionId}`,
+                "image": "https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=SmartPark",
+                "handler": async function (response) {
+                    try {
+                        await api.post(`/api/payments/process?sessionId=${sessionId}&paymentType=PAY_NOW`);
+                        showAlert(`Razorpay Payment Successful! TxID: ${response.razorpay_payment_id || 'RZP-' + sessionId}`, 'success');
+                        loadPayments();
+                    } catch (e) {
+                        showAlert(e.message || 'Payment processing failed', 'danger');
+                    }
+                },
+                "prefill": {
+                    "name": user.fullName || "User",
+                    "email": user.email || "user@example.com"
+                },
+                "theme": {
+                    "color": "#00d4ff"
+                }
+            };
+
+            if (typeof Razorpay !== 'undefined') {
+                const rzp1 = new Razorpay(options);
+                rzp1.open();
+            } else {
+                openInteractivePaymentGateway(sessionId, amount, () => loadPayments());
+            }
+        }
+
+        function openReceiptModal(p) {
+            document.getElementById('recTxId').innerText = p.transactionId || 'TXN-' + p.id;
+            document.getElementById('recSessionId').innerText = p.sessionId || '-';
+            document.getElementById('recDate').innerText = new Date(p.paymentDate).toLocaleString();
+            document.getElementById('recType').innerText = p.paymentType || 'PAY_NOW';
+            document.getElementById('recStatus').innerText = p.paymentStatus || 'PAID';
+            document.getElementById('recAmount').innerText = `₹${Number(p.amount).toFixed(2)}`;
+            document.getElementById('receiptModal').classList.add('active');
+        }
+
+        function closeReceiptModal() {
+            document.getElementById('receiptModal').classList.remove('active');
+        }
+
+        function downloadPdfInvoice() {
+            const element = document.getElementById('receiptContent');
+            const opt = {
+                margin:       10,
+                filename:     `SmartPark_Invoice_${document.getElementById('recTxId').innerText}.pdf`,
+                image:        { type: 'jpeg', quality: 0.98 },
+                html2canvas:  { scale: 2 },
+                jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            };
+
+            if (typeof html2pdf !== 'undefined') {
+                html2pdf().set(opt).from(element).save();
+                showAlert('Downloading Tax Invoice PDF...', 'success');
+            } else {
+                window.print();
+            }
+        }
+    </script>
+</body>
+</html>

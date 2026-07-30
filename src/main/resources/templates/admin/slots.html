@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manage Slots - SmartPark</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+</head>
+<body>
+    <div class="app-layout">
+        <div th:replace="~{fragments/sidebar :: sidebar}"></div>
+        
+        <div class="main-content">
+            <div th:replace="~{fragments/header :: header}"></div>
+            
+            <div class="content-wrapper">
+                <div class="card glass-panel">
+                    <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+                        <h3>Parking Slots</h3>
+                        <div style="display: flex; gap: 10px;">
+                            <select id="zoneFilter" onchange="loadSlots()" style="padding: 8px; border-radius: 4px; background: rgba(255,255,255,0.1); color: white; border: 1px solid rgba(255,255,255,0.2);">
+                                <option value="" style="color: #000;">All Zones</option>
+                                <option value="A" style="color: #000;">Zone A</option>
+                                <option value="B" style="color: #000;">Zone B</option>
+                                <option value="C" style="color: #000;">Zone C</option>
+                            </select>
+                            <button class="btn btn-primary" onclick="openSlotModal()">+ Add Slot</button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Slot Number</th>
+                                    <th>Zone</th>
+                                    <th>Vehicle Type</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="slotsTable">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slot Modal -->
+    <div id="slotModal" class="modal" style="display: none;">
+        <div class="modal-content glass-panel">
+            <h3 id="modalTitle">Add Slot</h3>
+            <form id="slotForm" onsubmit="saveSlot(event)">
+                <input type="hidden" id="slotId">
+                <div class="form-group">
+                    <label>Slot Number</label>
+                    <input type="text" id="slotNumber" required>
+                </div>
+                <div class="form-group">
+                    <label>Zone</label>
+                    <input type="text" id="slotZone" required placeholder="A, B, C...">
+                </div>
+                <div class="form-group">
+                    <label>Vehicle Type</label>
+                    <select id="vehicleType" required>
+                        <option value="TWO_WHEELER">Two Wheeler</option>
+                        <option value="FOUR_WHEELER">Four Wheeler</option>
+                        <option value="HEAVY_VEHICLE">Heavy Vehicle</option>
+                    </select>
+                </div>
+                <div style="display: flex; gap: 10px; margin-top: 20px;">
+                    <button type="submit" class="btn btn-primary">Save</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeSlotModal()">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="alertContainer"></div>
+    <script th:src="@{/js/app.js}"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            requireAdmin();
+            document.getElementById('pageTitle').innerText = 'Manage Slots';
+            loadSlots();
+        });
+
+        async function loadSlots() {
+            try {
+                const zone = document.getElementById('zoneFilter').value;
+                let url = '/api/admin/slots/all';
+                if (zone) url = `/api/admin/slots/zone/${zone}`;
+                
+                const slots = await api.get(url);
+                const tbody = document.getElementById('slotsTable');
+                tbody.innerHTML = '';
+                
+                if (slots && slots.length > 0) {
+                    slots.forEach(s => {
+                        const statusClass = !s.occupied ? 'success' : 'danger';
+                        const statusText = !s.occupied ? 'Available' : 'Occupied';
+                        tbody.innerHTML += `
+                            <tr>
+                                <td>${s.slotNumber}</td>
+                                <td>${s.zone}</td>
+                                <td>${s.vehicleType}</td>
+                                <td><span class="badge ${statusClass}">${statusText}</span></td>
+                                <td>
+                                    <button class="btn btn-sm btn-primary" onclick='editSlot(${JSON.stringify(s)})'>Edit</button>
+                                    <button class="btn btn-sm btn-danger" onclick="deleteSlot('${s.id}')">Delete</button>
+                                </td>
+                            </tr>
+                        `;
+                    });
+                } else {
+                    tbody.innerHTML = '<tr><td colspan="5" class="text-center">No slots found.</td></tr>';
+                }
+            } catch (error) {
+                showAlert(error.message || 'Error loading slots', 'danger');
+            }
+        }
+
+        function openSlotModal() {
+            document.getElementById('slotForm').reset();
+            document.getElementById('slotId').value = '';
+            document.getElementById('modalTitle').innerText = 'Add Slot';
+            document.getElementById('slotModal').style.display = 'flex';
+        }
+
+        function closeSlotModal() {
+            document.getElementById('slotModal').style.display = 'none';
+        }
+
+        function editSlot(s) {
+            document.getElementById('slotId').value = s.id;
+            document.getElementById('slotNumber').value = s.slotNumber;
+            document.getElementById('slotZone').value = s.zone;
+            document.getElementById('vehicleType').value = s.vehicleType;
+            document.getElementById('modalTitle').innerText = 'Edit Slot';
+            document.getElementById('slotModal').style.display = 'flex';
+        }
+
+        async function saveSlot(e) {
+            e.preventDefault();
+            const id = document.getElementById('slotId').value;
+            const payload = {
+                slotNumber: document.getElementById('slotNumber').value,
+                zone: document.getElementById('slotZone').value,
+                vehicleType: document.getElementById('vehicleType').value
+            };
+
+            try {
+                if (id) {
+                    await api.put(`/api/admin/slots/update/${id}`, payload);
+                    showAlert('Slot updated successfully', 'success');
+                } else {
+                    await api.post('/api/admin/slots/create', payload);
+                    showAlert('Slot added successfully', 'success');
+                }
+                closeSlotModal();
+                loadSlots();
+            } catch (error) {
+                showAlert(error.message || 'Failed to save slot', 'danger');
+            }
+        }
+
+        async function deleteSlot(id) {
+            if (confirm('Are you sure you want to delete this slot?')) {
+                try {
+                    await api.delete(`/api/admin/slots/delete/${id}`);
+                    showAlert('Slot deleted', 'success');
+                    loadSlots();
+                } catch (error) {
+                    showAlert(error.message || 'Failed to delete slot', 'danger');
+                }
+            }
+        }
+    </script>
+</body>
+</html>

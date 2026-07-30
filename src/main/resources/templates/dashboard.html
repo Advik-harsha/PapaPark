@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - SmartPark</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+</head>
+<body>
+    <div class="app-layout">
+        <div th:replace="~{fragments/sidebar :: sidebar}"></div>
+        
+        <div class="main-content">
+            <div th:replace="~{fragments/header :: header}"></div>
+            
+            <div class="content-wrapper">
+                <div class="stats-grid">
+                    <div class="stat-card glass-panel">
+                        <h3>Total Vehicles</h3>
+                        <p class="stat-value" id="statVehicles">0</p>
+                    </div>
+                    <div class="stat-card glass-panel">
+                        <h3>Active Sessions</h3>
+                        <p class="stat-value" id="statActiveSessions">0</p>
+                    </div>
+                    <div class="stat-card glass-panel">
+                        <h3>Total Spent</h3>
+                        <p class="stat-value" id="statSpent" style="color: var(--accent-primary);">₹0.00</p>
+                    </div>
+                    <div class="stat-card glass-panel">
+                        <h3>Wallet Balance</h3>
+                        <p class="stat-value" id="statWallet" style="color: var(--success);">₹0.00</p>
+                    </div>
+                </div>
+
+                <div class="card glass-panel mt-4">
+                    <div class="card-header">
+                        <h3>Recent Parking Sessions</h3>
+                    </div>
+                    <div class="card-body">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Session ID</th>
+                                    <th>Vehicle</th>
+                                    <th>Slot</th>
+                                    <th>Start Time</th>
+                                    <th>Duration</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="recentSessionsTable">
+                                <!-- Populated by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div id="alertContainer"></div>
+    <script th:src="@{/js/app.js}"></script>
+    <script>
+        let recentSessionsList = [];
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            requireAuth();
+            document.getElementById('pageTitle').innerText = 'Dashboard';
+            
+            try {
+                const user = api.getUser();
+                if (user) {
+                    document.getElementById('userGreeting').innerText = `Hello, ${user.fullName}`;
+                }
+                const userId = api.getUserId();
+                
+                let vehicles = [];
+                try { vehicles = await api.get('/api/vehicles/user/' + userId); } catch(e) {}
+                document.getElementById('statVehicles').innerText = vehicles?.length || 0;
+                
+                let sessions = [];
+                try { sessions = await api.get('/api/parking/user/' + userId); } catch(e) {}
+                const activeSessions = (sessions || []).filter(s => s.status === 'ACTIVE');
+                document.getElementById('statActiveSessions').innerText = activeSessions.length || 0;
+                
+                let payments = [];
+                try { payments = await api.get('/api/payments/user/' + userId); } catch(e) {}
+                const spent = (payments || []).reduce((acc, curr) => {
+                    if (curr.paymentStatus === 'PAID') return acc + (curr.amount || 0);
+                    return acc;
+                }, 0);
+                document.getElementById('statSpent').innerText = `₹${spent.toFixed(2)}`;
+                
+                let walletBalance = 0;
+                try { walletBalance = await api.get('/api/wallet/balance/' + userId); } catch(e) {}
+                document.getElementById('statWallet').innerText = `₹${(walletBalance || 0).toFixed(2)}`;
+
+                const tbody = document.getElementById('recentSessionsTable');
+                tbody.innerHTML = '';
+                
+                recentSessionsList = (sessions || []).slice(0, 5);
+                if (recentSessionsList.length > 0) {
+                    recentSessionsList.forEach(session => {
+                        const isLive = session.status === 'ACTIVE';
+                        const durationText = isLive 
+                            ? `<span class="live-timer-badge" id="dash-timer-${session.id}">⏱️ Live</span>`
+                            : (session.totalHours ? session.totalHours + ' hrs' : '-');
+
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `
+                            <td>${session.id}</td>
+                            <td>${session.vehicleNumber}</td>
+                            <td>${session.slotNumber}</td>
+                            <td>${new Date(session.entryTime).toLocaleTimeString()}</td>
+                            <td>${durationText}</td>
+                            <td><span class="badge ${isLive ? 'badge-success' : 'badge-info'}">${session.status}</span></td>
+                        `;
+                        tbody.appendChild(tr);
+                    });
+                    
+                    // Update dashboard live timers
+                    setInterval(updateDashTimers, 1000);
+                    updateDashTimers();
+                } else {
+                    tbody.innerHTML = '<tr><td colspan="6" class="text-center">No recent sessions found.</td></tr>';
+                }
+            } catch (error) {
+                showAlert(error.message || 'Error loading dashboard data', 'danger');
+                console.error(error);
+            }
+        });
+
+        function updateDashTimers() {
+            recentSessionsList.filter(s => s.status === 'ACTIVE').forEach(s => {
+                const el = document.getElementById(`dash-timer-${s.id}`);
+                if (!el) return;
+                const start = new Date(s.entryTime).getTime();
+                const diffMs = Math.max(0, new Date().getTime() - start);
+                const hrs = Math.floor(diffMs / 3600000);
+                const mins = Math.floor((diffMs % 3600000) / 60000);
+                const secs = Math.floor((diffMs % 60000) / 1000);
+                el.innerText = `⏱️ ${String(hrs).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+            });
+        }
+    </script>
+</body>
+</html>

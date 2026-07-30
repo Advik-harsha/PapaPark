@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Parking & Notifications - SmartPark</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+</head>
+<body>
+    <div class="app-layout">
+        <div th:replace="~{fragments/sidebar :: sidebar}"></div>
+        
+        <div class="main-content">
+            <div th:replace="~{fragments/header :: header}"></div>
+            
+            <div class="content-wrapper">
+                <!-- Mandatory Postpaid Alert Banner (Hidden by default) -->
+                <div id="postpaidWarningBanner" class="card mb-4" style="display: none; background: rgba(255, 82, 82, 0.15); border: 2px solid var(--danger); border-radius: 12px; padding: 20px;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 15px;">
+                        <div>
+                            <h3 style="color: var(--danger); margin: 0 0 5px 0;">🚫 Mandatory Payment Required (Unpaid Postpaid Dues)</h3>
+                            <p style="margin: 0; color: var(--text-primary); font-size: 0.9rem;">You have unpaid Postpaid dues from a previous parking session. You MUST settle your outstanding dues before starting a new parking session!</p>
+                        </div>
+                        <button id="bannerPayBtn" class="btn btn-danger" onclick="payPostpaidDuesNow()">💳 Pay Outstanding Dues Now</button>
+                    </div>
+                </div>
+
+                <!-- 3D & 2D Visual Parking Map -->
+                <div class="parking-map-container glass-panel">
+                    <div class="map-zone-header">
+                        <span>🗺️ Interactive Visual Parking Deck (Live 3D View)</span>
+                        <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                            <button id="toggle3dBtn" class="btn btn-sm btn-primary" onclick="toggle3dIsometricView()">🕶️ Toggle 3D Isometric</button>
+                            <button class="btn btn-sm btn-secondary" onclick="enableNotifications()">🔔 Enable SMS & Push Alerts</button>
+                        </div>
+                    </div>
+                    <div id="visualMapGrid" class="map-grid isometric-3d">
+                        <!-- Populated by JS -->
+                    </div>
+                    <div class="slot-legend">
+                        <div class="legend-item"><span class="legend-dot available"></span> Available (Click to select)</div>
+                        <div class="legend-item"><span class="legend-dot occupied"></span> Occupied</div>
+                        <div class="legend-item"><span class="legend-dot my-slot"></span> Your Active Slot</div>
+                    </div>
+                </div>
+
+
+                <!-- Instant Parking / Reservation Form Tabs -->
+                <div class="card glass-panel mb-4" id="bookingCard">
+                    <div class="card-header" style="display: flex; gap: 15px; border-bottom: 1px solid var(--glass-border); padding-bottom: 10px;">
+                        <button id="modeStartBtn" class="btn btn-sm btn-primary" onclick="switchBookingMode('INSTANT')">⚡ Instant Parking</button>
+                        <button id="modeReserveBtn" class="btn btn-sm btn-secondary" onclick="switchBookingMode('RESERVE')">📅 Slot Reservation</button>
+                    </div>
+                    <div class="card-body">
+                        <form id="startParkingForm" onsubmit="handleParkingForm(event)" style="display: flex; gap: 15px; align-items: flex-end; flex-wrap: wrap;">
+                            <div class="form-group" style="flex: 1; min-width: 200px; margin: 0;">
+                                <label>Select Vehicle</label>
+                                <select id="vehicleSelect" class="form-select" required>
+                                    <option value="">Loading...</option>
+                                </select>
+                            </div>
+                            <div class="form-group" style="flex: 1; min-width: 200px; margin: 0;">
+                                <label>Select Slot</label>
+                                <select id="slotSelect" class="form-select" required>
+                                    <option value="">Loading...</option>
+                                </select>
+                            </div>
+                            <div id="reservationTimeGroup" class="form-group" style="flex: 1; min-width: 200px; margin: 0; display: none;">
+                                <label>Reservation Time</label>
+                                <input type="datetime-local" id="reserveTimeInput" class="form-input">
+                            </div>
+                            <button type="submit" id="submitBookingBtn" class="btn btn-primary" style="height: 42px;">Start Session</button>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Active Sessions with Live Ticking Timer & QR Pass -->
+                <div class="card glass-panel mb-4">
+                    <div class="card-header">
+                        <h3>Active Parking Sessions with Live Timer</h3>
+                    </div>
+                    <div class="card-body">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Session ID</th>
+                                    <th>Vehicle</th>
+                                    <th>Slot</th>
+                                    <th>Start Time</th>
+                                    <th>Live Duration</th>
+                                    <th>Est. Amount</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="activeSessionsTable">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Past Sessions -->
+                <div class="card glass-panel">
+                    <div class="card-header">
+                        <h3>Past Sessions & Outstanding Dues</h3>
+                    </div>
+                    <div class="card-body">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Session ID</th>
+                                    <th>Vehicle</th>
+                                    <th>Slot</th>
+                                    <th>Duration</th>
+                                    <th>Cost</th>
+                                    <th>Payment Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="pastSessionsTable">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- QR Code Digital Pass & Gate Scanner Modal -->
+    <div id="qrPassModal" class="modal-overlay">
+        <div class="modal glass-panel" style="max-width: 450px; text-align: center;">
+            <div class="modal-header">
+                <h3>📱 SmartPark Digital Pass</h3>
+                <button class="btn-close" onclick="closeQrPassModal()">&times;</button>
+            </div>
+            <div class="modal-body" style="padding: 20px;">
+                <p style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 15px;">Scan at Automated Parking Barrier Gate</p>
+                <div style="background: white; padding: 15px; border-radius: 16px; display: inline-block; box-shadow: 0 10px 25px rgba(0,0,0,0.3);">
+                    <img id="qrPassImage" src="" alt="Gate QR Pass" style="width: 180px; height: 180px;">
+                </div>
+                <div style="margin-top: 15px; text-align: left; background: rgba(0,0,0,0.2); padding: 15px; border-radius: 8px;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 5px;"><span>Vehicle Number:</span> <strong id="qrVehicleNum">-</strong></div>
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 5px;"><span>Slot Reserved:</span> <strong id="qrSlotNum" style="color: var(--accent-primary);">-</strong></div>
+                    <div style="display: flex; justify-content: space-between;"><span>Pass Code:</span> <code id="qrPassCode" style="color: var(--success);">-</code></div>
+                </div>
+                
+                <button class="btn btn-success btn-block" style="margin-top: 15px;" onclick="simulateGateScan()">📷 Simulate Barrier Gate Scan</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="alertContainer"></div>
+    <script th:src="@{/js/app.js}"></script>
+    <script>
+        let bookingMode = 'INSTANT';
+        let activeSessionsData = [];
+        let pendingPostpaidSession = null;
+        let timerInterval = null;
+        let notifiedSessions = new Set();
+
+        document.addEventListener('DOMContentLoaded', () => {
+            requireAuth();
+            document.getElementById('pageTitle').innerText = 'Parking & Notifications';
+            loadFormData();
+            loadSessions();
+
+            timerInterval = setInterval(updateLiveTimers, 1000);
+            setInterval(loadFormData, 5000);
+        });
+
+        function toggle3dIsometricView() {
+            const grid = document.getElementById('visualMapGrid');
+            const btn = document.getElementById('toggle3dBtn');
+            if (grid.classList.contains('isometric-3d')) {
+                grid.classList.remove('isometric-3d');
+                btn.innerText = '🕶️ Enable 3D View';
+                btn.className = 'btn btn-sm btn-secondary';
+            } else {
+                grid.classList.add('isometric-3d');
+                btn.innerText = '🕶️ Flat 2D View';
+                btn.className = 'btn btn-sm btn-primary';
+            }
+        }
+
+        function enableNotifications() {
+
+            if ("Notification" in window) {
+                Notification.requestPermission().then(permission => {
+                    if (permission === "granted") {
+                        showAlert('✅ Web Push & SMS Notifications Enabled!', 'success');
+                    } else {
+                        showAlert('Notification permission denied', 'warning');
+                    }
+                });
+            }
+        }
+
+        function switchBookingMode(mode) {
+            bookingMode = mode;
+            document.getElementById('modeStartBtn').className = `btn btn-sm ${mode === 'INSTANT' ? 'btn-primary' : 'btn-secondary'}`;
+            document.getElementById('modeReserveBtn').className = `btn btn-sm ${mode === 'RESERVE' ? 'btn-primary' : 'btn-secondary'}`;
+
+            document.getElementById('reservationTimeGroup').style.display = (mode === 'RESERVE') ? 'block' : 'none';
+            document.getElementById('submitBookingBtn').innerText = (mode === 'RESERVE') ? '📅 Reserve Slot' : '⚡ Start Session';
+        }
+
+        async function loadFormData() {
+            try {
+                const userId = api.getUserId();
+                const [vehicles, allSlots] = await Promise.all([
+                    api.get('/api/vehicles/user/' + userId),
+                    api.get('/api/parking/slots/all')
+                ]);
+
+                const vehicleSelect = document.getElementById('vehicleSelect');
+                const currVehicle = vehicleSelect.value;
+                vehicleSelect.innerHTML = '<option value="">Select a vehicle...</option>';
+                (vehicles || []).forEach(v => {
+                    vehicleSelect.innerHTML += `<option value="${v.id}">${v.vehicleNumber} (${v.vehicleType})</option>`;
+                });
+                if (currVehicle) vehicleSelect.value = currVehicle;
+
+                const slotSelect = document.getElementById('slotSelect');
+                const currSlot = slotSelect.value;
+                slotSelect.innerHTML = '<option value="">Select a slot...</option>';
+                (allSlots || []).forEach(s => {
+                    if (!s.occupied) {
+                        slotSelect.innerHTML += `<option value="${s.id}">${s.slotNumber} (${s.zone}) - ${s.vehicleType}</option>`;
+                    }
+                });
+                if (currSlot) slotSelect.value = currSlot;
+
+                render2DMap(allSlots || []);
+            } catch (error) {
+                console.error(error);
+            }
+        }
+
+        function render2DMap(slots) {
+            const mapGrid = document.getElementById('visualMapGrid');
+            mapGrid.innerHTML = '';
+            const myActiveSlotIds = activeSessionsData.map(s => s.slotId);
+
+            slots.forEach(s => {
+                const isMine = myActiveSlotIds.includes(s.id);
+                let statusClass = 'available';
+                let icon = '🅿️';
+
+                if (isMine) {
+                    statusClass = 'my-slot';
+                    icon = '🚗';
+                } else if (s.occupied) {
+                    statusClass = 'occupied';
+                    icon = '🔒';
+                }
+
+                const pill = document.createElement('div');
+                pill.className = `slot-card-pill ${statusClass}`;
+                pill.innerHTML = `
+                    <span style="font-size: 1.2rem;">${icon}</span>
+                    <span class="slot-pill-num">${s.slotNumber}</span>
+                    <span class="slot-pill-type">${s.zone} · ${s.vehicleType.replace('_', ' ')}</span>
+                `;
+
+                if (!s.occupied && !isMine) {
+                    pill.onclick = () => {
+                        document.getElementById('slotSelect').value = s.id;
+                        showAlert(`Selected Slot ${s.slotNumber} (${s.zone})`, 'info');
+                    };
+                }
+
+                mapGrid.appendChild(pill);
+            });
+        }
+
+        async function loadSessions() {
+            try {
+                const userId = api.getUserId();
+                const allSessions = await api.get('/api/parking/user/' + userId);
+                
+                activeSessionsData = (allSessions || []).filter(s => s.status === 'ACTIVE');
+                const past = (allSessions || []).filter(s => s.status !== 'ACTIVE');
+
+                // Check for unpaid Postpaid/Pay-Later dues
+                pendingPostpaidSession = past.find(s => s.paymentStatus === 'PENDING');
+                const warningBanner = document.getElementById('postpaidWarningBanner');
+                const submitBtn = document.getElementById('submitBookingBtn');
+
+                if (pendingPostpaidSession) {
+                    warningBanner.style.display = 'block';
+                    document.getElementById('bannerPayBtn').innerText = `💳 Pay Outstanding Dues (₹${pendingPostpaidSession.totalAmount.toFixed(2)})`;
+                    submitBtn.disabled = true;
+                    submitBtn.innerText = '🚫 Locked (Pay Dues First)';
+                } else {
+                    warningBanner.style.display = 'none';
+                    submitBtn.disabled = false;
+                    submitBtn.innerText = (bookingMode === 'RESERVE') ? '📅 Reserve Slot' : '⚡ Start Session';
+                }
+
+                renderActiveSessions(activeSessionsData);
+                renderPastSessions(past);
+            } catch (error) {
+                showAlert(error.message || 'Error loading sessions', 'danger');
+            }
+        }
+
+        function payPostpaidDuesNow() {
+            if (pendingPostpaidSession) {
+                triggerGateway(pendingPostpaidSession.id, pendingPostpaidSession.totalAmount);
+            }
+        }
+
+        function renderActiveSessions(sessions) {
+            const tbody = document.getElementById('activeSessionsTable');
+            tbody.innerHTML = '';
+            
+            if (sessions && sessions.length > 0) {
+                sessions.forEach(s => {
+                    tbody.innerHTML += `
+                        <tr id="session-row-${s.id}">
+                            <td>${s.id}</td>
+                            <td>${s.vehicleNumber}</td>
+                            <td>${s.slotNumber}</td>
+                            <td>${new Date(s.entryTime).toLocaleTimeString()}</td>
+                            <td><span class="live-timer-badge" id="timer-${s.id}">⏱️ 00:00:00</span></td>
+                            <td><span id="cost-${s.id}" style="font-weight: 700; color: var(--accent-primary);">₹30.00</span></td>
+                            <td>
+                                <button class="btn btn-sm btn-secondary" onclick="openQrPassModal('${s.id}', '${s.vehicleNumber}', '${s.slotNumber}')">📱 QR Pass</button>
+                                <button class="btn btn-sm btn-danger" onclick="initiateEndSession('${s.id}')">End Parking</button>
+                            </td>
+                        </tr>
+                    `;
+                });
+                updateLiveTimers();
+            } else {
+                tbody.innerHTML = '<tr><td colspan="7" class="text-center">No active parking sessions.</td></tr>';
+            }
+        }
+
+        function updateLiveTimers() {
+            activeSessionsData.forEach(s => {
+                const timerEl = document.getElementById(`timer-${s.id}`);
+                const costEl = document.getElementById(`cost-${s.id}`);
+                if (!timerEl) return;
+
+                const start = new Date(s.entryTime).getTime();
+                const now = new Date().getTime();
+                const diffMs = Math.max(0, now - start);
+
+                const hrs = Math.floor(diffMs / 3600000);
+                const mins = Math.floor((diffMs % 3600000) / 60000);
+                const secs = Math.floor((diffMs % 60000) / 1000);
+
+                timerEl.innerText = `⏱️ ${String(hrs).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+
+                const totalHours = Math.max(1, Math.ceil(diffMs / 3600000));
+                let estCost = 30;
+                if (totalHours > 1) {
+                    estCost += (totalHours - 1) * 20;
+                }
+                if (costEl) costEl.innerText = `₹${estCost.toFixed(2)}`;
+
+                if (mins >= 5 && !notifiedSessions.has(s.id)) {
+                    notifiedSessions.add(s.id);
+                    sendBrowserNotification('⏱️ SmartPark Timer Alert', `Your vehicle ${s.vehicleNumber} has been parked in Slot ${s.slotNumber} for ${mins} minutes.`);
+                    sendSmsAlert(api.getUser()?.phone, `SmartPark Alert: Session for ${s.vehicleNumber} in slot ${s.slotNumber} active for 5+ mins.`);
+                }
+            });
+        }
+
+        function renderPastSessions(sessions) {
+            const tbody = document.getElementById('pastSessionsTable');
+            tbody.innerHTML = '';
+
+            if (sessions && sessions.length > 0) {
+                sessions.forEach(s => {
+                    const isPaid = s.paymentStatus === 'PAID';
+                    const payBtn = !isPaid 
+                        ? `<button class="btn btn-sm btn-primary" onclick="triggerGateway('${s.id}', ${s.totalAmount})">💳 Pay Dues</button>`
+                        : `<span class="badge badge-success">PAID</span>`;
+
+                    tbody.innerHTML += `
+                        <tr>
+                            <td>${s.id}</td>
+                            <td>${s.vehicleNumber}</td>
+                            <td>${s.slotNumber}</td>
+                            <td>${s.totalHours ? s.totalHours + ' hrs' : '-'}</td>
+                            <td>₹${(s.totalAmount || 0).toFixed(2)}</td>
+                            <td><span class="badge ${isPaid ? 'badge-success' : 'badge-warning'}">${s.paymentStatus}</span></td>
+                            <td>${payBtn}</td>
+                        </tr>
+                    `;
+                });
+            } else {
+                tbody.innerHTML = '<tr><td colspan="7" class="text-center">No past parking sessions.</td></tr>';
+            }
+        }
+
+        async function handleParkingForm(e) {
+            e.preventDefault();
+            if (pendingPostpaidSession) {
+                showAlert('🚫 Mandatory Payment Required: Settle your outstanding Postpaid dues first!', 'danger');
+                return;
+            }
+
+            const vehicleId = document.getElementById('vehicleSelect').value;
+            const slotId = document.getElementById('slotSelect').value;
+
+            try {
+                const session = await api.post(`/api/parking/start?vehicleId=${vehicleId}&slotId=${slotId}`);
+                
+                sendBrowserNotification('🅿️ Parking Started', `Session started for slot ${session.slotNumber}`);
+                sendSmsAlert(api.getUser()?.phone, `SmartPark: Parking started for ${session.vehicleNumber} at slot ${session.slotNumber}`);
+                
+                document.getElementById('startParkingForm').reset();
+                loadSessions();
+                
+                openQrPassModal(session.id, session.vehicleNumber, session.slotNumber);
+            } catch (error) {
+                showAlert(error.message || 'Failed to process booking', 'danger');
+            }
+        }
+
+        function openQrPassModal(sessionId, vehicleNum, slotNum) {
+            document.getElementById('qrVehicleNum').innerText = vehicleNum;
+            document.getElementById('qrSlotNum').innerText = slotNum;
+            document.getElementById('qrPassCode').innerText = `PASS-${sessionId.substring(0, 8).toUpperCase()}`;
+            
+            const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=SMARTPARK_ENTRY:${sessionId}:${vehicleNum}:${slotNum}`;
+            document.getElementById('qrPassImage').src = qrUrl;
+            document.getElementById('qrPassModal').classList.add('active');
+        }
+
+        function closeQrPassModal() {
+            document.getElementById('qrPassModal').classList.remove('active');
+        }
+
+        function simulateGateScan() {
+            showAlert('📷 Gate Barrier Scanned: ACCESS GRANTED! Gate Opening...', 'success');
+            setTimeout(closeQrPassModal, 1500);
+        }
+
+        async function initiateEndSession(sessionId) {
+            if (confirm('End this parking session and proceed to checkout?')) {
+                try {
+                    const endedSession = await api.post(`/api/parking/end/${sessionId}`);
+                    sendBrowserNotification('🏁 Parking Ended', `Session ended. Bill Amount: ₹${endedSession.totalAmount.toFixed(2)}`);
+                    sendSmsAlert(api.getUser()?.phone, `SmartPark: Parking ended. Total Bill: Rs.${endedSession.totalAmount.toFixed(2)}`);
+                    
+                    openInteractivePaymentGateway(endedSession.id, endedSession.totalAmount, () => loadSessions());
+                } catch (error) {
+                    showAlert(error.message || 'Failed to end session', 'danger');
+                }
+            }
+        }
+
+        function triggerGateway(sessionId, amount) {
+            openInteractivePaymentGateway(sessionId, amount, () => loadSessions());
+        }
+    </script>
+</body>
+</html>
