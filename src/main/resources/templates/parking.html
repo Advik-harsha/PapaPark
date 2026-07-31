@@ -26,16 +26,16 @@
                     </div>
                 </div>
 
-                <!-- 3D & 2D Visual Parking Map -->
+                <!-- Visual Parking Map Deck -->
                 <div class="parking-map-container glass-panel">
                     <div class="map-zone-header">
-                        <span>🗺️ Interactive Visual Parking Deck (Live 3D View)</span>
+                        <span>🗺️ Interactive Visual Parking Deck</span>
                         <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
-                            <button id="toggle3dBtn" class="btn btn-sm btn-primary" onclick="toggle3dIsometricView()">🕶️ Toggle 3D Isometric</button>
+                            <span class="badge badge-success" style="font-size: 0.75rem;">🟢 Live 5s Sync</span>
                             <button class="btn btn-sm btn-secondary" onclick="enableNotifications()">🔔 Enable SMS & Push Alerts</button>
                         </div>
                     </div>
-                    <div id="visualMapGrid" class="map-grid isometric-3d">
+                    <div id="visualMapGrid" class="map-grid">
                         <!-- Populated by JS -->
                     </div>
                     <div class="slot-legend">
@@ -44,6 +44,7 @@
                         <div class="legend-item"><span class="legend-dot my-slot"></span> Your Active Slot</div>
                     </div>
                 </div>
+
 
 
                 <!-- Instant Parking / Reservation Form Tabs -->
@@ -168,21 +169,8 @@
             setInterval(loadFormData, 5000);
         });
 
-        function toggle3dIsometricView() {
-            const grid = document.getElementById('visualMapGrid');
-            const btn = document.getElementById('toggle3dBtn');
-            if (grid.classList.contains('isometric-3d')) {
-                grid.classList.remove('isometric-3d');
-                btn.innerText = '🕶️ Enable 3D View';
-                btn.className = 'btn btn-sm btn-secondary';
-            } else {
-                grid.classList.add('isometric-3d');
-                btn.innerText = '🕶️ Flat 2D View';
-                btn.className = 'btn btn-sm btn-primary';
-            }
-        }
-
         function enableNotifications() {
+
 
             if ("Notification" in window) {
                 Notification.requestPermission().then(permission => {
