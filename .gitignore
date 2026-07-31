@@ -3,10 +3,14 @@ target/
 !**/src/main/**
 !**/src/test/**
 
-### Agent Markdown Artifacts ###
+### Agent Markdown & Temporary Artifacts ###
 implementation_plan.md
 task.md
 walkthrough.md
+SandboxPro_Upload_Folder/
+PapaPark_SourceCode.zip
+atlas-credentials.env
+new/
 
 ### Optionals ###
 .DS_Store
