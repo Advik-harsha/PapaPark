@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SmartPark - Futuristic Automated Parking & Reservation</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+    <style>
+        .landing-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 40px;
+            background: rgba(15, 25, 35, 0.85);
+            backdrop-filter: blur(16px);
+            border-bottom: 1px solid var(--glass-border);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .landing-logo {
+            font-size: 1.5rem;
+            font-weight: 800;
+            color: var(--accent-primary);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            text-shadow: 0 0 15px rgba(0, 212, 255, 0.4);
+        }
+
+        .landing-nav {
+            display: flex;
+            gap: 25px;
+            align-items: center;
+        }
+
+        .landing-nav a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-weight: 500;
+            font-size: 0.95rem;
+            transition: all 0.2s ease;
+        }
+
+        .landing-nav a:hover {
+            color: var(--accent-primary);
+        }
+
+        .hero-section {
+            padding: 90px 40px 60px 40px;
+            max-width: 1200px;
+            margin: 0 auto;
+            text-align: center;
+        }
+
+        .hero-title {
+            font-size: 3.5rem;
+            font-weight: 900;
+            line-height: 1.15;
+            background: linear-gradient(135deg, #ffffff 30%, var(--accent-primary) 70%, #00e676 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 20px;
+            letter-spacing: -1px;
+        }
+
+        .hero-subtitle {
+            font-size: 1.25rem;
+            color: var(--text-secondary);
+            max-width: 750px;
+            margin: 0 auto 35px auto;
+            line-height: 1.6;
+        }
+
+        .hero-cta-group {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin-bottom: 50px;
+        }
+
+        .hero-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-top: 40px;
+        }
+
+        .hero-stat-card {
+            background: rgba(15, 25, 35, 0.6);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            padding: 24px;
+            backdrop-filter: blur(10px);
+            transition: all 0.3s ease;
+        }
+
+        .hero-stat-card:hover {
+            transform: translateY(-5px);
+            border-color: var(--accent-primary);
+            box-shadow: 0 10px 30px rgba(0, 212, 255, 0.2);
+        }
+
+        .hero-stat-num {
+            font-size: 2.4rem;
+            font-weight: 800;
+            color: var(--accent-primary);
+            margin-bottom: 5px;
+        }
+
+        .hero-stat-label {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .feature-section {
+            max-width: 1200px;
+            margin: 60px auto;
+            padding: 0 20px;
+        }
+
+        .section-header {
+            text-align: center;
+            margin-bottom: 45px;
+        }
+
+        .section-header h2 {
+            font-size: 2.2rem;
+            font-weight: 800;
+            color: var(--text-primary);
+            margin-bottom: 10px;
+        }
+
+        .section-header p {
+            color: var(--text-secondary);
+            font-size: 1rem;
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 24px;
+        }
+
+        .feature-card {
+            background: rgba(15, 25, 35, 0.7);
+            border: 1px solid var(--glass-border);
+            border-radius: 18px;
+            padding: 30px;
+            transition: all 0.3s ease;
+            transform-style: preserve-3d;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-8px) rotateX(4deg);
+            border-color: var(--accent-primary);
+            box-shadow: 0 15px 35px rgba(0, 212, 255, 0.25);
+        }
+
+        .feature-icon {
+            font-size: 2.8rem;
+            margin-bottom: 15px;
+        }
+
+        .feature-card h3 {
+            font-size: 1.3rem;
+            font-weight: 700;
+            margin-bottom: 10px;
+            color: var(--text-primary);
+        }
+
+        .feature-card p {
+            color: var(--text-secondary);
+            font-size: 0.92rem;
+            line-height: 1.6;
+        }
+
+        .calc-box {
+            background: rgba(15, 25, 35, 0.85);
+            border: 1px solid var(--accent-primary);
+            border-radius: 20px;
+            padding: 35px;
+            max-width: 650px;
+            margin: 0 auto;
+            box-shadow: 0 15px 40px rgba(0, 212, 255, 0.2);
+        }
+
+        .landing-footer {
+            background: rgba(8, 14, 22, 0.95);
+            border-top: 1px solid var(--glass-border);
+            padding: 40px 20px;
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            margin-top: 80px;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Header Navigation -->
+    <header class="landing-header">
+        <div class="landing-logo">
+            <span>🅿️</span> SmartPark
+        </div>
+        <nav class="landing-nav">
+            <a href="#features">Features</a>
+            <a href="#demo3d">3D Map</a>
+            <a href="#calculator">Pricing</a>
+            <a th:href="@{/login}" class="btn btn-secondary btn-sm" style="padding: 8px 18px;">Sign In</a>
+            <a th:href="@{/register}" class="btn btn-primary btn-sm" style="padding: 8px 18px;">Get Started</a>
+        </nav>
+    </header>
+
+    <!-- Hero Section -->
+    <section class="hero-section">
+        <span class="badge badge-success mb-3" style="font-size: 0.85rem; padding: 6px 16px;">🟢 Live System Operational · 100% Automated</span>
+        <h1 class="hero-title">The Future of Automated Smart Parking & Reservation</h1>
+        <p class="hero-subtitle">Experience 3D isometric slot mapping, digital QR barrier pass access, Razorpay payments, 1-click PDF receipts, SMS alerts, and postpaid pay-later billing.</p>
+        
+        <div class="hero-cta-group">
+            <a th:href="@{/register}" class="btn btn-primary" style="padding: 14px 32px; font-size: 1.05rem;">⚡ Book a Parking Slot</a>
+            <a th:href="@{/login}" class="btn btn-secondary" style="padding: 14px 32px; font-size: 1.05rem;">🔑 Access Dashboard</a>
+        </div>
+
+        <!-- Live Metrics Grid -->
+        <div class="hero-stats">
+            <div class="hero-stat-card">
+                <div class="hero-stat-num">12+</div>
+                <div class="hero-stat-label">Active Parking Slots</div>
+            </div>
+            <div class="hero-stat-card">
+                <div class="hero-stat-num">5s</div>
+                <div class="hero-stat-label">Real-Time Sync</div>
+            </div>
+            <div class="hero-stat-card">
+                <div class="hero-stat-num">100%</div>
+                <div class="hero-stat-label">Digital QR Passes</div>
+            </div>
+            <div class="hero-stat-card">
+                <div class="hero-stat-num">₹30</div>
+                <div class="hero-stat-label">Base Hourly Rate</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section id="features" class="feature-section">
+        <div class="section-header">
+            <h2>State-of-the-Art Smart Parking System</h2>
+            <p>Packed with 8 advanced features for drivers and facility administrators</p>
+        </div>
+
+        <div class="features-grid">
+            <div class="feature-card">
+                <div class="feature-icon">🕶️</div>
+                <h3>3D Isometric Parking Deck</h3>
+                <p>Interactive 3D deck view with elevation hover, live 5s availability polling, and 3D animated vehicle indicators.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">📱</div>
+                <h3>Digital QR Barrier Pass</h3>
+                <p>Generates instant QR code passes upon reservation with a built-in automated gate barrier scan simulator.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">💳</div>
+                <h3>Razorpay & PaySecure Modal</h3>
+                <p>Supports Razorpay Test Mode, Credit/Debit cards, UPI QR codes (GPay/PhonePe/Paytm), and 3D OTP verification.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">📄</div>
+                <h3>Downloadable PDF Invoices</h3>
+                <p>1-click instant PDF tax invoice generation with official GSTIN formatting, itemized billing, and transaction IDs.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">📱</div>
+                <h3>SMS & Push Notifications</h3>
+                <p>Automated Email & SMS dispatch for booking confirmations, duration milestone warnings (5m / 1h), and OTPs.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">⏳</div>
+                <h3>Postpaid Pay-Later Billing</h3>
+                <p>Park now and pay later with mandatory next-session payment enforcement to ensure zero unpaid dues.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Pricing Calculator Section -->
+    <section id="calculator" class="feature-section">
+        <div class="section-header">
+            <h2>⚡ Instant Rate Estimator</h2>
+            <p>Calculate your estimated parking bill before you arrive</p>
+        </div>
+
+        <div class="calc-box">
+            <div class="form-group mb-3">
+                <label>Estimated Parking Duration (Hours)</label>
+                <input type="number" id="calcHours" class="form-input" min="1" max="72" value="2" oninput="calculateEstimate()">
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--glass-border); pt-3; margin-top: 20px; padding-top: 15px;">
+                <span style="font-size: 1.1rem; color: var(--text-secondary);">Total Estimated Fare:</span>
+                <h1 id="calcTotal" style="font-size: 2.2rem; color: var(--success); margin: 0;">₹50.00</h1>
+            </div>
+            <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 10px; text-align: center;">Rate: ₹30 for 1st Hour + ₹20 per additional hour</p>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="landing-footer">
+        <p>🅿️ <strong>SmartPark Systems</strong> · Next-Generation Smart Parking Solution</p>
+        <p style="margin-top: 5px;">Built with Spring Boot 3, MongoDB, Thymeleaf & 3D CSS Graphics · MIT License</p>
+    </footer>
+
+    <div id="alertContainer"></div>
+    <script th:src="@{/js/app.js}"></script>
+    <script>
+        function calculateEstimate() {
+            const hrs = parseInt(document.getElementById('calcHours').value) || 1;
+            let total = 30;
+            if (hrs > 1) {
+                total += (hrs - 1) * 20;
+            }
+            document.getElementById('calcTotal').innerText = `₹${total.toFixed(2)}`;
+        }
+    </script>
+</body>
+</html>
