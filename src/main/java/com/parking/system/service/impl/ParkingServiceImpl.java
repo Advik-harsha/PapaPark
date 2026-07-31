@@ -114,6 +114,13 @@ public class ParkingServiceImpl implements ParkingService {
         session.setExitTime(LocalDateTime.now());
         session.setStatus(ParkingStatus.COMPLETED);
 
+        // Free the parking slot in MongoDB immediately upon ending session
+        if (session.getParkingSlot() != null) {
+            ParkingSlot slot = session.getParkingSlot();
+            slot.setOccupied(false);
+            slotRepository.save(slot);
+        }
+
         // Calculate hours
         long minutes = Duration.between(session.getEntryTime(), session.getExitTime()).toMinutes();
         int hours = (int) Math.ceil(minutes / 60.0);

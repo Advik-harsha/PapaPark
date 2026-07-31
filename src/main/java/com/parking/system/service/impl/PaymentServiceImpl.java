@@ -2,12 +2,14 @@ package com.parking.system.service.impl;
 
 import com.parking.system.dto.PaymentDto;
 import com.parking.system.entity.ParkingSession;
+import com.parking.system.entity.ParkingSlot;
 import com.parking.system.entity.Payment;
 import com.parking.system.enums.PaymentStatus;
 import com.parking.system.enums.PaymentType;
 import com.parking.system.exception.EntityNotFoundException;
 import com.parking.system.exception.PaymentException;
 import com.parking.system.repository.ParkingSessionRepository;
+import com.parking.system.repository.ParkingSlotRepository;
 import com.parking.system.repository.PaymentRepository;
 import com.parking.system.service.EmailService;
 import com.parking.system.service.PaymentService;
@@ -29,6 +31,9 @@ public class PaymentServiceImpl implements PaymentService {
 
     @Autowired
     private ParkingSessionRepository sessionRepository;
+
+    @Autowired
+    private ParkingSlotRepository slotRepository;
 
     @Autowired
     private WalletService walletService;
@@ -69,15 +74,19 @@ public class PaymentServiceImpl implements PaymentService {
                 .paymentDate(LocalDateTime.now())
                 .build();
 
+        // Ensure parking slot is un-occupied and saved in MongoDB
+        if (session.getParkingSlot() != null) {
+            ParkingSlot slot = session.getParkingSlot();
+            slot.setOccupied(false);
+            slotRepository.save(slot);
+        }
+
         if (type == PaymentType.WALLET) {
             try {
                 walletService.deductMoney(session.getUser().getId(), session.getTotalAmount(), 
                         "Paid for parking session " + sessionId);
                 payment.setPaymentStatus(PaymentStatus.PAID);
                 session.setPaymentStatus(PaymentStatus.PAID);
-                if (session.getParkingSlot() != null) {
-                    session.getParkingSlot().setOccupied(false);
-                }
             } catch (Exception e) {
                 payment.setPaymentStatus(PaymentStatus.FAILED);
                 payment = paymentRepository.save(payment);
@@ -86,13 +95,9 @@ public class PaymentServiceImpl implements PaymentService {
         } else if (type == PaymentType.PAY_NOW) {
             payment.setPaymentStatus(PaymentStatus.PAID);
             session.setPaymentStatus(PaymentStatus.PAID);
-            if (session.getParkingSlot() != null) {
-                session.getParkingSlot().setOccupied(false);
-            }
-        } else if (type == PaymentType.PAY_LATER) {
-            if (session.getParkingSlot() != null) {
-                session.getParkingSlot().setOccupied(false);
-            }
+        } else if (type == PaymentType.PAY_LATER || type == PaymentType.POSTPAID) {
+            payment.setPaymentStatus(PaymentStatus.PENDING);
+            session.setPaymentStatus(PaymentStatus.PENDING);
         }
 
         sessionRepository.save(session);

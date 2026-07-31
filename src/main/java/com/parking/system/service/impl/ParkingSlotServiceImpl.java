@@ -44,6 +44,7 @@ public class ParkingSlotServiceImpl implements ParkingSlotService {
         slot.setSlotNumber(slotDto.getSlotNumber());
         slot.setZone(slotDto.getZone());
         slot.setVehicleType(slotDto.getVehicleType());
+        slot.setOccupied(slotDto.isOccupied());
         
         slot = slotRepository.save(slot);
         return mapToDto(slot);
