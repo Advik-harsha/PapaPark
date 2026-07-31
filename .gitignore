@@ -3,6 +3,11 @@ target/
 !**/src/main/**
 !**/src/test/**
 
+### Agent Markdown Artifacts ###
+implementation_plan.md
+task.md
+walkthrough.md
+
 ### Optionals ###
 .DS_Store
 .idea/
